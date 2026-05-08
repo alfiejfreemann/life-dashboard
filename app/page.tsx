@@ -39,10 +39,10 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-black flex flex-col">
 
-      {/* Faint blue radial glow — top right */}
+      {/* Faint vignette */}
       <div
-        className="pointer-events-none fixed top-0 right-0 w-[600px] h-[600px] opacity-[0.04]"
-        style={{ background: 'radial-gradient(circle at top right, #3b82f6, transparent 70%)' }}
+        className="pointer-events-none fixed inset-0 opacity-40"
+        style={{ background: 'radial-gradient(ellipse at center, transparent 40%, #000 100%)' }}
       />
 
       {/* Nav */}

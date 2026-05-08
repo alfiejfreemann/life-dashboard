@@ -1,349 +1,278 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  Zap, TrendingUp, DollarSign, Flame, CheckCircle2, Circle,
-  Plus, Timer, Dumbbell, Apple, Heart, Target,
-  Trophy, AlertTriangle, ArrowDown, BarChart3, Activity
-} from 'lucide-react'
+import { Plus, CheckCircle2, Circle, ArrowDown, ArrowUpRight, TrendingUp, ChevronRight } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, RadarChart,
-  Radar, PolarGrid, PolarAngleAxis
+  CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import QuickLogModal from '@/components/QuickLogModal'
-
-const HYROX_STATIONS = [
-  { station: 'Run 1km ×8', target: '4:30', current: '5:10', pct: 73 },
-  { station: 'SkiErg', target: '4:00', current: '4:45', pct: 69 },
-  { station: 'Sled Push', target: '2:20', current: '3:00', pct: 65 },
-  { station: 'Sled Pull', target: '2:20', current: '2:50', pct: 73 },
-  { station: 'Burpee BJ', target: '4:10', current: '5:30', pct: 58 },
-  { station: 'Row 1km', target: '3:50', current: '4:20', pct: 79 },
-  { station: 'Farmers Carry', target: '2:30', current: '2:40', pct: 87 },
-  { station: 'Sandbag Lunges', target: '4:10', current: '5:00', pct: 62 },
-  { station: 'Wall Balls', target: '5:10', current: '6:30', pct: 58 },
-]
-
-const DAILY_HABITS = [
-  { id: 'training', label: 'Training session completed' },
-  { id: 'protein', label: 'Hit 200g protein' },
-  { id: 'sleep', label: '8h+ sleep last night' },
-  { id: 'zone2', label: '30min Zone 2 cardio' },
-  { id: 'hydration', label: '3L water' },
-  { id: 'sunlight', label: 'Morning sunlight (10 min)' },
-  { id: 'cold', label: 'Cold shower' },
-  { id: 'steps', label: '10,000 steps' },
-]
+import Link from 'next/link'
 
 const weightData = [
-  { date: 'Apr 1', weight: 82.4 }, { date: 'Apr 8', weight: 82.1 },
-  { date: 'Apr 15', weight: 81.6 }, { date: 'Apr 22', weight: 81.2 },
-  { date: 'Apr 29', weight: 80.8 }, { date: 'May 6', weight: 80.4 },
-  { date: 'May 8', weight: 80.2 },
+  { date: '1 Apr', weight: 82.4 },
+  { date: '8 Apr', weight: 82.1 },
+  { date: '15 Apr', weight: 81.6 },
+  { date: '22 Apr', weight: 81.2 },
+  { date: '29 Apr', weight: 80.8 },
+  { date: '6 May', weight: 80.4 },
+  { date: '8 May', weight: 80.2 },
 ]
 
-const trainingWeekData = [
-  { day: 'Mon', mins: 65 }, { day: 'Tue', mins: 90 }, { day: 'Wed', mins: 45 },
-  { day: 'Thu', mins: 75 }, { day: 'Fri', mins: 60 }, { day: 'Sat', mins: 120 }, { day: 'Sun', mins: 0 },
+const trainingWeek = [
+  { day: 'M', mins: 65 }, { day: 'T', mins: 90 }, { day: 'W', mins: 45 },
+  { day: 'T', mins: 75 }, { day: 'F', mins: 60 }, { day: 'S', mins: 120 }, { day: 'S', mins: 0 },
 ]
 
-const radarData = [
-  { subject: 'Running', A: 62 }, { subject: 'Strength', A: 74 },
-  { subject: 'Endurance', A: 58 }, { subject: 'Recovery', A: 70 },
-  { subject: 'Nutrition', A: 65 }, { subject: 'Sleep', A: 72 },
+const HABITS = [
+  'Training session done',
+  'Hit 200g protein',
+  '8h+ sleep',
+  'Zone 2 — 30 min',
+  '3L water',
+  'Morning sunlight',
+  'Cold shower',
+  '10k steps',
 ]
 
-function getDaysToRace() {
-  return Math.ceil((new Date('2026-07-19').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+const TODAY_FOCUS = [
+  { text: 'Wall Balls + Burpee Broad Jumps — your 2 weakest Hyrox stations. 4 sets max.', tag: 'TRAINING' },
+  { text: '200g protein minimum. You\'re in recomp — muscle loss is the enemy.', tag: 'NUTRITION' },
+  { text: 'Zone 2 run, 30-45 min at HR 130-145. This builds your Hyrox base.', tag: 'CARDIO' },
+]
+
+const HYROX_STATIONS = [
+  { name: 'Run ×8', pct: 73 }, { name: 'SkiErg', pct: 69 }, { name: 'Sled Push', pct: 65 },
+  { name: 'Sled Pull', pct: 73 }, { name: 'Burpee BJ', pct: 58 }, { name: 'Row', pct: 79 },
+  { name: 'Farmers', pct: 87 }, { name: 'Sandbag', pct: 62 }, { name: 'Wall Balls', pct: 58 },
+]
+
+function getDays() {
+  return Math.ceil((new Date('2026-07-19').getTime() - new Date().getTime()) / 86400000)
 }
 
 function getGreeting() {
   const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 18) return 'Good afternoon'
-  return 'Good evening'
+  return h < 12 ? 'Morning' : h < 18 ? 'Afternoon' : 'Evening'
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload?.length) {
-    return (
-      <div className="custom-tooltip">
-        <p className="text-neutral-500 text-xs mb-1">{label}</p>
-        <p className="text-white font-semibold">{payload[0].value}</p>
-      </div>
-    )
-  }
-  return null
+const Tip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="custom-tooltip">
+      <p className="text-neutral-500 text-xs">{label}</p>
+      <p className="text-white font-semibold mt-0.5">{payload[0].value}</p>
+    </div>
+  )
 }
 
 export default function Dashboard() {
-  const [habits, setHabits] = useState<Record<string, boolean>>({})
-  const [showQuickLog, setShowQuickLog] = useState(false)
+  const [habits, setHabits] = useState<Record<number, boolean>>({})
   const [logType, setLogType] = useState<'workout' | 'body' | 'nutrition'>('workout')
+  const [showLog, setShowLog] = useState(false)
+  const days = getDays()
+  const done = Object.values(habits).filter(Boolean).length
+  const totalMins = trainingWeek.reduce((s, d) => s + d.mins, 0)
 
-  const daysToRace = getDaysToRace()
-  const completedHabits = Object.values(habits).filter(Boolean).length
-  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
-  const totalMins = trainingWeekData.reduce((s, d) => s + d.mins, 0)
-
-  const openLog = (type: 'workout' | 'body' | 'nutrition') => {
-    setLogType(type); setShowQuickLog(true)
-  }
+  const openLog = (t: 'workout' | 'body' | 'nutrition') => { setLogType(t); setShowLog(true) }
 
   return (
-    <div className="animate-fade-in space-y-5 pb-24 md:pb-8">
+    <div className="animate-fade-in pb-24 md:pb-8">
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 pt-2">
+      {/* ── TOP BAR ───────────────────────────────────── */}
+      <div className="flex items-end justify-between py-6 border-b border-[#111]">
         <div>
-          <p className="text-neutral-600 text-xs uppercase tracking-widest">{today}</p>
-          <h1 className="text-2xl md:text-3xl font-bold text-white mt-1">{getGreeting()}, Alfie</h1>
-          <p className="text-blue-500 text-sm mt-1 font-medium">
-            {daysToRace} days to Hyrox Sydney — stay locked in.
+          <p className="text-neutral-600 text-xs uppercase tracking-widest">
+            {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
+          <h1 className="text-2xl font-bold text-white mt-0.5">{getGreeting()}, Alfie.</h1>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => openLog('workout')} className="btn-blue flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Log Workout
-          </button>
-          <button onClick={() => openLog('body')} className="btn-ghost flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" /> Log Body
+        <div className="flex items-center gap-2">
+          <button onClick={() => openLog('body')} className="btn-ghost text-xs px-3 py-1.5">Log Body</button>
+          <button onClick={() => openLog('workout')} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1.5">
+            <Plus className="w-3.5 h-3.5" /> Workout
           </button>
         </div>
       </div>
 
-      {/* Key stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Hyrox Countdown" value={`${Math.floor(daysToRace / 7)}w ${daysToRace % 7}d`} sub="19 July 2026" icon={<Timer className="w-4 h-4" />} accent />
-        <StatCard label="Body Weight" value="80.2 kg" sub="↓ 2.2kg from start" icon={<TrendingUp className="w-4 h-4" />} />
-        <StatCard label="Body Fat %" value="14.2%" sub="Goal: sub 10%" icon={<Target className="w-4 h-4" />} />
-        <StatCard label="Online Income" value="£1,450" sub="Goal: £10,000/mo" icon={<DollarSign className="w-4 h-4" />} />
+      {/* ── RACE HERO ─────────────────────────────────── */}
+      <div className="py-8 border-b border-[#111]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] text-neutral-600 uppercase tracking-widest font-medium mb-2">Hyrox Sydney · 19 July 2026</p>
+            <div className="flex items-baseline gap-3">
+              <span className="text-7xl md:text-8xl font-black text-white tracking-tighter leading-none">{days}</span>
+              <div>
+                <p className="text-neutral-400 text-xl font-light">days</p>
+                <p className="text-neutral-700 text-sm">to race</p>
+              </div>
+            </div>
+            <p className="text-neutral-600 text-sm mt-3">
+              Est. finish <span className="text-white font-semibold">68:30</span> ·
+              Need <span className="text-white font-semibold">−8:31</span> ·
+              Target <span className="text-white font-semibold">59:59</span>
+            </p>
+          </div>
+
+          {/* Station readiness mini */}
+          <div className="hidden md:block">
+            <p className="text-[10px] text-neutral-700 uppercase tracking-wider mb-3">Station readiness</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {HYROX_STATIONS.map(s => (
+                <div key={s.name} className="text-center">
+                  <div className="w-10 h-10 rounded-full border border-[#1f1f1f] flex items-center justify-center mx-auto mb-1"
+                    style={{ background: `conic-gradient(${s.pct >= 80 ? '#fff' : s.pct >= 65 ? '#555' : '#2a2a2a'} ${s.pct * 3.6}deg, #111 0deg)` }}>
+                    <div className="w-7 h-7 rounded-full bg-black flex items-center justify-center">
+                      <span className="text-[9px] text-white font-bold">{s.pct}</span>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-neutral-600">{s.name}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Mission + habits */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 card space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-white flex items-center gap-2">
-              <Flame className="w-4 h-4 text-neutral-400" /> Today's Mission
-            </h2>
-            <span className="text-xs text-neutral-600">{completedHabits}/{DAILY_HABITS.length} habits done</span>
+      {/* ── 4 KEY METRICS ─────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 border-b border-[#111]">
+        {[
+          { label: 'Body Weight', value: '80.2', unit: 'kg', delta: '↓ 2.2', link: '/body' },
+          { label: 'Body Fat', value: '14.2', unit: '%', delta: '↓ 0.4', link: '/body' },
+          { label: 'Weekly Training', value: `${totalMins}`, unit: 'min', delta: '6 sessions', link: '/training' },
+          { label: 'Online Income', value: '£1,450', unit: '/mo', delta: '↑ £350', link: '/finance' },
+        ].map((m, i) => (
+          <Link key={m.label} href={m.link}
+            className={`group p-5 hover:bg-[#080808] transition-colors duration-150 ${i < 3 ? 'border-r border-[#111]' : ''} ${i >= 2 ? 'border-t border-[#111] md:border-t-0' : ''}`}>
+            <p className="text-[10px] text-neutral-600 uppercase tracking-widest mb-2">{m.label}</p>
+            <p className="text-2xl font-bold text-white tracking-tight">
+              {m.value}<span className="text-neutral-500 text-sm font-normal ml-0.5">{m.unit}</span>
+            </p>
+            <p className="text-xs text-neutral-600 mt-1 flex items-center gap-1">
+              {m.delta}
+              <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </p>
+          </Link>
+        ))}
+      </div>
+
+      {/* ── TODAY'S FOCUS + HABITS ─────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 border-b border-[#111]">
+
+        {/* Focus — 2/3 width */}
+        <div className="md:col-span-2 p-5 border-r border-[#111]">
+          <p className="text-[10px] text-neutral-600 uppercase tracking-widest mb-4">Today's Focus</p>
+          <div className="space-y-3">
+            {TODAY_FOCUS.map((f, i) => (
+              <div key={i} className="flex gap-3">
+                <span className="text-[10px] text-neutral-700 font-mono mt-0.5 w-5 flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                <div>
+                  <span className="text-[10px] text-neutral-600 font-medium uppercase tracking-wider mr-2">{f.tag}</span>
+                  <p className="text-sm text-neutral-300 leading-relaxed mt-0.5">{f.text}</p>
+                </div>
+              </div>
+            ))}
           </div>
-          <PriorityAction icon={<Zap className="w-4 h-4 text-blue-500" />} title="Hyrox Station Work" desc="Wall Balls + Sandbag Lunges are your weakest stations. 4 sets max effort today." urgency="high" />
-          <PriorityAction icon={<Apple className="w-4 h-4 text-white" />} title="Hit 200g protein" desc="You're in recomp. Protein protects muscle while you cut. Non-negotiable." urgency="high" />
-          <PriorityAction icon={<Heart className="w-4 h-4 text-neutral-400" />} title="Zone 2 run — 30-45 min" desc="HR 130-145bpm. Aerobic base is what separates sub-60 finishers." urgency="medium" />
-          <PriorityAction icon={<Dumbbell className="w-4 h-4 text-neutral-400" />} title="Leg strength" desc="Squats + RDLs. Leg power directly translates to sled speed. Add weight." urgency="medium" />
         </div>
 
-        <div className="card space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-white flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-neutral-400" /> Daily Habits
-            </h2>
-            <span className="text-xs text-neutral-600">{completedHabits}/{DAILY_HABITS.length}</span>
+        {/* Habits — 1/3 width */}
+        <div className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[10px] text-neutral-600 uppercase tracking-widest">Habits</p>
+            <span className="text-xs text-neutral-500">{done}/{HABITS.length}</span>
           </div>
-          <div className="h-1 rounded-full bg-[#1a1a1a] overflow-hidden">
-            <div
-              className="h-full rounded-full bg-blue-600 transition-all duration-500"
-              style={{ width: `${(completedHabits / DAILY_HABITS.length) * 100}%` }}
-            />
+          <div className="h-px bg-[#111] mb-4">
+            <div className="h-full bg-white transition-all duration-500" style={{ width: `${(done / HABITS.length) * 100}%` }} />
           </div>
-          <div className="space-y-1.5">
-            {DAILY_HABITS.map(habit => (
-              <button
-                key={habit.id}
-                onClick={() => setHabits(p => ({ ...p, [habit.id]: !p[habit.id] }))}
-                className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all duration-150 text-xs
-                  ${habits[habit.id]
-                    ? 'bg-white/5 border border-white/10 text-white'
-                    : 'bg-[#0f0f0f] border border-[#1a1a1a] text-neutral-500 hover:text-neutral-300'
-                  }`}
-              >
-                {habits[habit.id]
-                  ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-white" />
-                  : <Circle className="w-3.5 h-3.5 flex-shrink-0" />
-                }
-                {habit.label}
+          <div className="space-y-1">
+            {HABITS.map((h, i) => (
+              <button key={i} onClick={() => setHabits(p => ({ ...p, [i]: !p[i] }))}
+                className={`w-full flex items-center gap-2.5 py-1.5 text-left transition-all duration-150
+                  ${habits[i] ? 'text-white' : 'text-neutral-600 hover:text-neutral-400'}`}>
+                {habits[i]
+                  ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                  : <Circle className="w-3.5 h-3.5 flex-shrink-0" />}
+                <span className={`text-xs ${habits[i] ? 'line-through text-neutral-500' : ''}`}>{h}</span>
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card">
+      {/* ── CHARTS ────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 border-b border-[#111]">
+        <div className="p-5 border-r border-[#111]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-white">Weight Trend</h2>
+            <p className="text-[10px] text-neutral-600 uppercase tracking-widest">Weight Trend</p>
             <span className="text-xs text-neutral-500 flex items-center gap-1">
               <ArrowDown className="w-3 h-3" /> −2.2 kg
             </span>
           </div>
-          <ResponsiveContainer width="100%" height={160}>
-            <AreaChart data={weightData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={140}>
+            <AreaChart data={weightData} margin={{ top: 5, right: 0, left: -30, bottom: 0 }}>
               <defs>
                 <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#fff" stopOpacity={0.06} />
+                  <stop offset="95%" stopColor="#fff" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#111" />
-              <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#444', fontSize: 10 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={1.5} fill="url(#wg)" dot={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#0f0f0f" />
+              <XAxis dataKey="date" tick={{ fill: '#333', fontSize: 9 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#333', fontSize: 9 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
+              <Tooltip content={<Tip />} />
+              <Area type="monotone" dataKey="weight" stroke="#fff" strokeWidth={1} fill="url(#wg)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
-          <p className="text-xs text-neutral-700 mt-2">Goal: 74 kg @ sub-10% body fat</p>
+          <p className="text-[10px] text-neutral-700 mt-2">Goal: 74 kg @ sub-10% body fat</p>
         </div>
 
-        <div className="card">
+        <div className="p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-white">This Week's Training</h2>
+            <p className="text-[10px] text-neutral-600 uppercase tracking-widest">This Week</p>
             <span className="text-xs text-neutral-500">{totalMins} min</span>
           </div>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={trainingWeekData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#111" vertical={false} />
-              <XAxis dataKey="day" tick={{ fill: '#444', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#444', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="mins" fill="#3b82f6" radius={[3, 3, 0, 0]} opacity={0.8} />
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={trainingWeek} margin={{ top: 5, right: 0, left: -30, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#0f0f0f" vertical={false} />
+              <XAxis dataKey="day" tick={{ fill: '#333', fontSize: 9 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#333', fontSize: 9 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<Tip />} />
+              <Bar dataKey="mins" fill="#ffffff" radius={[2, 2, 0, 0]} opacity={0.7} />
             </BarChart>
           </ResponsiveContainer>
-          <p className="text-xs text-neutral-700 mt-2">Target: 7+ hours/week for sub-60</p>
+          <p className="text-[10px] text-neutral-700 mt-2">Target: 7+ hours/week</p>
         </div>
       </div>
 
-      {/* Hyrox breakdown */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="font-semibold text-white flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-neutral-400" /> Hyrox Sub-60 Breakdown
-            </h2>
-            <p className="text-xs text-neutral-600 mt-0.5">Current vs target time per station</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-neutral-600">Est. current finish</p>
-            <p className="text-white font-bold text-xl">~68:30</p>
-            <p className="text-xs text-neutral-700">Need to lose 8:31</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-          {HYROX_STATIONS.map(s => (
-            <div key={s.station} className="bg-[#0a0a0a] rounded-xl p-3 border border-[#1a1a1a]">
+      {/* ── GOALS ROW ─────────────────────────────────── */}
+      <div className="p-5">
+        <p className="text-[10px] text-neutral-600 uppercase tracking-widest mb-5">Goal Progress</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { label: 'Sub-60 Hyrox', from: '68:30', to: '59:59', pct: 42, link: '/training' },
+            { label: 'Sub-10% Body Fat', from: '14.2%', to: '9.9%', pct: 28, link: '/body' },
+            { label: '£10k/mo Online', from: '£1,450', to: '£10,000', pct: 15, link: '/finance' },
+          ].map(g => (
+            <Link key={g.label} href={g.link} className="group">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-neutral-300">{s.station}</span>
-                <span className={`text-xs font-semibold ${s.pct >= 80 ? 'text-white' : s.pct >= 65 ? 'text-blue-400' : 'text-neutral-500'}`}>
-                  {s.pct >= 80 ? '✓ Good' : s.pct >= 65 ? '~ Close' : '↑ Fix this'}
+                <span className="text-sm text-neutral-300 font-medium">{g.label}</span>
+                <span className="text-xs text-neutral-600 group-hover:text-white transition-colors flex items-center gap-1">
+                  {g.pct}% <ArrowUpRight className="w-3 h-3" />
                 </span>
               </div>
-              <div className="flex justify-between text-xs text-neutral-600 mb-1.5">
-                <span>Now: <span className="text-neutral-300">{s.current}</span></span>
-                <span>Target: <span className="text-blue-400">{s.target}</span></span>
+              <div className="h-px bg-[#1a1a1a]">
+                <div className="h-full bg-white transition-all duration-700" style={{ width: `${g.pct}%` }} />
               </div>
-              <div className="h-1 rounded-full bg-[#1a1a1a]">
-                <div className="h-full rounded-full transition-all duration-700" style={{
-                  width: `${s.pct}%`,
-                  background: s.pct >= 80 ? '#ffffff' : s.pct >= 65 ? '#3b82f6' : '#374151'
-                }} />
+              <div className="flex justify-between mt-1.5">
+                <span className="text-[10px] text-neutral-700">{g.from}</span>
+                <span className="text-[10px] text-neutral-700">{g.to}</span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
-        <div className="mt-4 p-3 rounded-xl bg-[#0a0a0a] border border-[#1a1a1a]">
-          <p className="text-white text-sm font-semibold flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-neutral-500" />
-            Priority: Wall Balls · Burpee Broad Jump · Sandbag Lunges
-          </p>
-          <p className="text-xs text-neutral-600 mt-1">
-            These 3 stations are costing you ~8 minutes. Fix them and you hit sub-60 comfortably.
-          </p>
-        </div>
       </div>
 
-      {/* Radar + goals */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card">
-          <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-neutral-400" /> Performance Profile
-          </h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <RadarChart data={radarData} margin={{ top: 10, right: 30, left: 30, bottom: 10 }}>
-              <PolarGrid stroke="#1a1a1a" />
-              <PolarAngleAxis dataKey="subject" tick={{ fill: '#555', fontSize: 11 }} />
-              <Radar name="You" dataKey="A" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} strokeWidth={1.5} />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="card space-y-4">
-          <h2 className="font-semibold text-white flex items-center gap-2">
-            <Target className="w-4 h-4 text-neutral-400" /> Goal Progress
-          </h2>
-          <GoalProgress label="Sub-60 Hyrox" current="68:30" target="59:59" pct={42} />
-          <GoalProgress label="Body Fat Sub-10%" current="14.2%" target="9.9%" pct={28} />
-          <GoalProgress label="£10k/mo Online" current="£1,450" target="£10,000" pct={15} />
-          <GoalProgress label="Gym Job Sydney" current="2 apps" target="10 apps" pct={20} />
-          <GoalProgress label="Double Testosterone" current="1×" target="2×" pct={35} />
-        </div>
-      </div>
-
-      {showQuickLog && <QuickLogModal type={logType} onClose={() => setShowQuickLog(false)} />}
-    </div>
-  )
-}
-
-function StatCard({ label, value, sub, icon, accent }: {
-  label: string; value: string; sub: string; icon: React.ReactNode; accent?: boolean
-}) {
-  return (
-    <div className={`card hover:border-[#2a2a2a] transition-all duration-200 ${accent ? 'border-blue-900/40' : ''}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${accent ? 'bg-blue-950 text-blue-400' : 'bg-[#141414] text-neutral-500'}`}>
-          {icon}
-        </div>
-        <div className={`w-1.5 h-1.5 rounded-full mt-1 ${accent ? 'bg-blue-500' : 'bg-[#2a2a2a]'}`} />
-      </div>
-      <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
-      <p className="text-xs text-neutral-600 mt-0.5">{label}</p>
-      <p className="text-xs text-neutral-700 mt-0.5">{sub}</p>
-    </div>
-  )
-}
-
-function PriorityAction({ icon, title, desc, urgency }: {
-  icon: React.ReactNode; title: string; desc: string; urgency: 'high' | 'medium'
-}) {
-  return (
-    <div className={`flex gap-3 p-3 rounded-xl border ${urgency === 'high' ? 'border-[#1f2937] bg-[#0a0f18]' : 'border-[#1a1a1a] bg-[#0a0a0a]'}`}>
-      <div className="mt-0.5 flex-shrink-0">{icon}</div>
-      <div>
-        <p className="text-sm font-semibold text-white">{title}</p>
-        <p className="text-xs text-neutral-600 mt-0.5 leading-relaxed">{desc}</p>
-      </div>
-    </div>
-  )
-}
-
-function GoalProgress({ label, current, target, pct }: {
-  label: string; current: string; target: string; pct: number
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm text-neutral-300">{label}</span>
-        <span className="text-xs font-bold text-blue-500">{pct}%</span>
-      </div>
-      <div className="h-1 rounded-full bg-[#1a1a1a]">
-        <div className="h-full rounded-full bg-blue-600 transition-all duration-700" style={{ width: `${pct}%` }} />
-      </div>
-      <div className="flex justify-between mt-1">
-        <span className="text-xs text-neutral-700">Now: {current}</span>
-        <span className="text-xs text-neutral-700">Target: {target}</span>
-      </div>
+      {showLog && <QuickLogModal type={logType} onClose={() => setShowLog(false)} />}
     </div>
   )
 }
