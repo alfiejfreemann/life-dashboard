@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { TrendingDown, Target, Plus, Camera, Ruler, Scale, ArrowDown, Info } from 'lucide-react'
+import { TrendingDown, Target, Plus, Ruler, Scale, ArrowDown, Info, Zap } from 'lucide-react'
 import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -27,31 +27,39 @@ const measurements = [
   { part: 'R. Quad', current: 58.5, start: 56.5, unit: 'cm', goal: 63 },
 ]
 
-// Testosterone optimisation checklist
+// Testosterone protocol with impact multipliers
 const TESTO_PROTOCOL = [
-  { action: 'Morning sunlight (10-20 min)', category: 'Circadian', impact: 'high' },
-  { action: 'Strength train 4x/week (compound lifts)', category: 'Training', impact: 'high' },
-  { action: 'Sleep 8-9 hours — DEEP SLEEP = testosterone', category: 'Recovery', impact: 'high' },
-  { action: 'Eat saturated fats (eggs, red meat, olive oil)', category: 'Nutrition', impact: 'high' },
-  { action: 'Zinc + Magnesium supplement before bed', category: 'Supplements', impact: 'medium' },
-  { action: 'Vitamin D3 (5000 IU daily)', category: 'Supplements', impact: 'medium' },
-  { action: 'Cold exposure (ice bath / cold shower)', category: 'Recovery', impact: 'medium' },
-  { action: 'Reduce alcohol to 0', category: 'Lifestyle', impact: 'high' },
-  { action: 'Manage stress (cortisol kills testosterone)', category: 'Lifestyle', impact: 'high' },
-  { action: 'Intermittent fasting (16:8) if cutting', category: 'Nutrition', impact: 'medium' },
-  { action: 'Sprint intervals 1-2x/week', category: 'Training', impact: 'medium' },
-  { action: 'Ashwagandha (600mg/day)', category: 'Supplements', impact: 'medium' },
+  { action: 'Morning sunlight — 10-20 min outside', category: 'Circadian', impact: 'high', boost: 15, mechanism: 'Resets cortisol rhythm, boosts LH signalling' },
+  { action: 'Strength train 4×/week — compound lifts', category: 'Training', impact: 'high', boost: 25, mechanism: 'Acute T spike post-lift, long-term receptor upregulation' },
+  { action: '8-9 hours sleep — dark, cold room (18°C)', category: 'Recovery', impact: 'high', boost: 30, mechanism: '70% of daily T is produced during deep sleep (stages 3-4)' },
+  { action: 'Eat saturated fat daily — eggs, red meat, olive oil', category: 'Nutrition', impact: 'high', boost: 20, mechanism: 'Cholesterol = testosterone precursor. Low fat = low T.' },
+  { action: 'Zero alcohol', category: 'Lifestyle', impact: 'high', boost: 15, mechanism: 'Alcohol directly suppresses Leydig cells — the T factories' },
+  { action: 'Manage stress — cortisol and T are inversely linked', category: 'Lifestyle', impact: 'high', boost: 12, mechanism: 'Cortisol competes with T. Chronic stress = chronically low T.' },
+  { action: 'Sprint intervals 1-2×/week', category: 'Training', impact: 'medium', boost: 8, mechanism: 'High intensity = highest acute T spike of any exercise type' },
+  { action: 'Zinc 25-30mg before bed', category: 'Supplements', impact: 'medium', boost: 10, mechanism: 'Essential cofactor for testosterone synthesis — most men are deficient' },
+  { action: 'Vitamin D3 5000IU + K2 daily', category: 'Supplements', impact: 'medium', boost: 12, mechanism: 'D3 acts like a hormone — D-deficient men have 65% lower T' },
+  { action: 'Magnesium Glycinate 400mg before bed', category: 'Supplements', impact: 'medium', boost: 8, mechanism: 'Increases free T by reducing SHBG binding' },
+  { action: 'Cold exposure — ice bath or cold shower', category: 'Recovery', impact: 'medium', boost: 6, mechanism: 'Stimulates gonadotropin release + reduces testicular temp' },
+  { action: 'Ashwagandha KSM-66 600mg/day', category: 'Supplements', impact: 'medium', boost: 10, mechanism: 'Reduces cortisol ~27%, studies show 15-40% T increase' },
+]
+
+const T_KILLERS = [
+  { thing: 'Alcohol', effect: '−25% T after heavy night', severity: 'high' },
+  { thing: 'Sleep deprivation (<6h)', effect: '−15% per night', severity: 'high' },
+  { thing: 'Chronic cardio (no strength training)', effect: '−10-20%', severity: 'high' },
+  { thing: 'Seed oils / ultra-processed food', effect: '−10-15%', severity: 'medium' },
+  { thing: 'Chronic stress', effect: 'Cortisol blocks T production', severity: 'high' },
+  { thing: 'Plastic bottles / BPA', effect: 'Xenoestrogens disrupt T', severity: 'medium' },
+  { thing: 'Being overweight (high body fat)', effect: 'Aromatase converts T → oestrogen', severity: 'high' },
 ]
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload?.length) {
     return (
       <div className="custom-tooltip">
-        <p className="text-gray-400 text-xs mb-1">{label}</p>
+        <p className="text-neutral-500 text-xs mb-1">{label}</p>
         {payload.map((p: any) => (
-          <p key={p.name} className="font-semibold text-sm" style={{ color: p.color }}>
-            {p.name}: {p.value}{p.name === 'bf' ? '%' : ' kg'}
-          </p>
+          <p key={p.name} className="font-semibold text-sm text-white">{p.name}: {p.value}{p.name === 'bf' ? '%' : ' kg'}</p>
         ))}
       </div>
     )
@@ -70,88 +78,82 @@ export default function BodyPage() {
   const targetWeight = leanMassKg / (1 - targetBF / 100)
   const fatToLose = currentWeight - targetWeight
 
+  const totalBoost = TESTO_PROTOCOL
+    .filter(p => checkedProtocol.has(p.action))
+    .reduce((sum, p) => sum + p.boost, 0)
+  const estimatedTMultiplier = (1 + Math.min(totalBoost, 120) / 100).toFixed(2)
+  const checkedCount = checkedProtocol.size
+  const highImpactDone = TESTO_PROTOCOL.filter(p => p.impact === 'high' && checkedProtocol.has(p.action)).length
+  const highImpactTotal = TESTO_PROTOCOL.filter(p => p.impact === 'high').length
+
   const toggleProtocol = (action: string) => {
     setCheckedProtocol(prev => {
-      const next = new Set(prev)
-      next.has(action) ? next.delete(action) : next.add(action)
-      return next
+      const next = new Set(prev); next.has(action) ? next.delete(action) : next.add(action); return next
     })
   }
 
   return (
-    <div className="animate-fade-in space-y-6 pb-24 md:pb-8">
+    <div className="animate-fade-in space-y-5 pb-24 md:pb-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
-            <TrendingDown className="w-7 h-7 text-brand-green" />
+            <TrendingDown className="w-6 h-6 text-neutral-400" />
             Body Composition
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Bigger + leaner + more testosterone — all at once</p>
+          <p className="text-neutral-600 text-sm mt-1">Bigger + leaner + more testosterone — in parallel</p>
         </div>
         <button onClick={() => setShowLog(true)} className="btn-primary flex items-center gap-2 w-fit">
-          <Plus className="w-4 h-4" />
-          Log Today
+          <Plus className="w-4 h-4" /> Log Today
         </button>
       </div>
 
-      {/* Key body stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card text-center">
-          <p className="text-3xl font-bold text-white">{currentWeight} kg</p>
-          <p className="text-xs text-gray-500 mt-1">Current Weight</p>
-          <p className="text-xs text-brand-green mt-0.5 flex items-center justify-center gap-1">
-            <ArrowDown className="w-3 h-3" />2.2kg lost
-          </p>
-        </div>
-        <div className="card text-center">
-          <p className="text-3xl font-bold text-brand-orange">{currentBF}%</p>
-          <p className="text-xs text-gray-500 mt-1">Body Fat %</p>
-          <p className="text-xs text-gray-600 mt-0.5">Goal: sub 10%</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-3xl font-bold text-brand-cyan">{leanMassKg.toFixed(1)} kg</p>
-          <p className="text-xs text-gray-500 mt-1">Lean Mass</p>
-          <p className="text-xs text-gray-600 mt-0.5">Protect this at all costs</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-3xl font-bold text-brand-purple">{fatToLose.toFixed(1)} kg</p>
-          <p className="text-xs text-gray-500 mt-1">Fat Left to Lose</p>
-          <p className="text-xs text-gray-600 mt-0.5">Target: {targetWeight.toFixed(1)}kg @ 10%</p>
-        </div>
+      {/* Key stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: 'Current Weight', value: `${currentWeight} kg`, sub: '↓ 2.2kg lost' },
+          { label: 'Body Fat %', value: `${currentBF}%`, sub: 'Goal: sub 10%' },
+          { label: 'Lean Mass', value: `${leanMassKg.toFixed(1)} kg`, sub: 'Protect this' },
+          { label: 'Fat Left to Lose', value: `${fatToLose.toFixed(1)} kg`, sub: `Target: ${targetWeight.toFixed(1)}kg` },
+        ].map(s => (
+          <div key={s.label} className="card text-center">
+            <p className="text-2xl font-bold text-white">{s.value}</p>
+            <p className="text-xs text-neutral-600 mt-1">{s.label}</p>
+            <p className="text-xs text-neutral-700 mt-0.5">{s.sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* The Math Card */}
-      <div className="card bg-gradient-to-r from-brand-cyan/5 to-brand-green/5 border-brand-cyan/15">
+      {/* Recomp blueprint */}
+      <div className="card border-blue-950/50">
         <h2 className="font-semibold text-white mb-3 flex items-center gap-2">
-          <Info className="w-5 h-5 text-brand-cyan" />
-          The Recomp Blueprint — Bigger AND Leaner
+          <Info className="w-4 h-4 text-blue-500" /> The Recomp Blueprint
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <p className="text-brand-cyan font-semibold mb-2">Daily Calorie Target</p>
-            <div className="space-y-1 text-xs text-gray-400">
-              <p>Maintenance: ~2,900 kcal</p>
-              <p>Deficit for cutting: <span className="text-white">2,500 kcal</span></p>
-              <p>Protein: <span className="text-white">200g minimum</span> (2.5g/kg)</p>
-              <p>Rate of loss: <span className="text-brand-green">~0.5kg/week</span></p>
+          <div className="space-y-1.5">
+            <p className="text-xs text-neutral-500 uppercase tracking-wider font-semibold">Daily Targets</p>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between"><span className="text-neutral-600">Calories</span><span className="text-white font-semibold">2,500 kcal</span></div>
+              <div className="flex justify-between"><span className="text-neutral-600">Protein</span><span className="text-white font-semibold">200g minimum</span></div>
+              <div className="flex justify-between"><span className="text-neutral-600">Rate of loss</span><span className="text-white font-semibold">~0.5kg/week</span></div>
+              <div className="flex justify-between"><span className="text-neutral-600">Creatine</span><span className="text-white font-semibold">5g/day</span></div>
             </div>
           </div>
-          <div>
-            <p className="text-brand-green font-semibold mb-2">Timeline to Sub-10% BF</p>
-            <div className="space-y-1 text-xs text-gray-400">
-              <p>Fat to lose: <span className="text-white">{fatToLose.toFixed(1)}kg</span></p>
-              <p>At 0.5kg/wk: <span className="text-white">~{Math.ceil(fatToLose / 0.5)} weeks</span></p>
-              <p>Target date: <span className="text-brand-orange">Aug/Sep 2026</span></p>
-              <p>Race day lean: <span className="text-brand-green">achievable</span></p>
+          <div className="space-y-1.5">
+            <p className="text-xs text-neutral-500 uppercase tracking-wider font-semibold">Timeline to Sub-10%</p>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between"><span className="text-neutral-600">Fat to lose</span><span className="text-white font-semibold">{fatToLose.toFixed(1)} kg</span></div>
+              <div className="flex justify-between"><span className="text-neutral-600">At 0.5kg/wk</span><span className="text-white font-semibold">~{Math.ceil(fatToLose / 0.5)} weeks</span></div>
+              <div className="flex justify-between"><span className="text-neutral-600">Est. date</span><span className="text-blue-400 font-semibold">Aug/Sep 2026</span></div>
+              <div className="flex justify-between"><span className="text-neutral-600">Race day</span><span className="text-white font-semibold">~12% BF (lean)</span></div>
             </div>
           </div>
-          <div>
-            <p className="text-brand-orange font-semibold mb-2">Muscle Growth Strategy</p>
-            <div className="space-y-1 text-xs text-gray-400">
+          <div className="space-y-1.5">
+            <p className="text-xs text-neutral-500 uppercase tracking-wider font-semibold">Muscle Growth</p>
+            <div className="space-y-1 text-xs text-neutral-600">
               <p>Progressive overload every session</p>
-              <p>Prioritise <span className="text-white">compound lifts</span></p>
-              <p>Legs 2x/week minimum</p>
-              <p>Creatine 5g/day non-negotiable</p>
+              <p>Compound lifts — squat, deadlift, press</p>
+              <p>Leg day minimum 2×/week</p>
+              <p>Creatine 5g/day — non-negotiable</p>
             </div>
           </div>
         </div>
@@ -160,41 +162,40 @@ export default function BodyPage() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="card">
-          <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
-            <Scale className="w-5 h-5 text-brand-cyan" />
-            Weight Trend
-          </h2>
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={weightHistory} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-white flex items-center gap-2"><Scale className="w-4 h-4 text-neutral-500" /> Weight</h2>
+            <span className="text-xs text-neutral-600 flex items-center gap-1"><ArrowDown className="w-3 h-3" />2.2 kg</span>
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={weightHistory} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
               <defs>
                 <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00f5ff" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#00f5ff" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
-              <XAxis dataKey="date" tick={{ fill: '#555', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#555', fontSize: 11 }} axisLine={false} tickLine={false} domain={[78, 84]} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#111" />
+              <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#444', fontSize: 10 }} axisLine={false} tickLine={false} domain={[78, 84]} />
               <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={targetWeight} stroke="#00ff88" strokeDasharray="4 4" label={{ value: `${targetWeight.toFixed(1)}kg goal`, fill: '#00ff88', fontSize: 10 }} />
-              <Area type="monotone" dataKey="weight" name="weight" stroke="#00f5ff" strokeWidth={2} fill="url(#wGrad)" dot={false} />
+              <ReferenceLine y={targetWeight} stroke="#1d4ed8" strokeDasharray="4 4" />
+              <Area type="monotone" dataKey="weight" name="weight" stroke="#3b82f6" strokeWidth={1.5} fill="url(#wGrad)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
-
         <div className="card">
-          <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
-            <Target className="w-5 h-5 text-brand-orange" />
-            Body Fat % Trend
-          </h2>
-          <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={weightHistory} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
-              <XAxis dataKey="date" tick={{ fill: '#555', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#555', fontSize: 11 }} axisLine={false} tickLine={false} domain={[9, 18]} />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-white flex items-center gap-2"><Target className="w-4 h-4 text-neutral-500" /> Body Fat %</h2>
+            <span className="text-xs text-neutral-600">Goal: sub-10%</span>
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={weightHistory} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#111" />
+              <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#444', fontSize: 10 }} axisLine={false} tickLine={false} domain={[9, 18]} />
               <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={10} stroke="#ff6b35" strokeDasharray="4 4" label={{ value: '10% goal', fill: '#ff6b35', fontSize: 10 }} />
-              <Line type="monotone" dataKey="bf" name="bf" stroke="#ff6b35" strokeWidth={2} dot={{ fill: '#ff6b35', r: 4 }} />
+              <ReferenceLine y={10} stroke="#374151" strokeDasharray="4 4" />
+              <Line type="monotone" dataKey="bf" name="bf" stroke="#ffffff" strokeWidth={1.5} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -203,8 +204,7 @@ export default function BodyPage() {
       {/* Measurements */}
       <div className="card">
         <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
-          <Ruler className="w-5 h-5 text-brand-cyan" />
-          Body Measurements
+          <Ruler className="w-4 h-4 text-neutral-500" /> Body Measurements
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {measurements.map(m => {
@@ -212,75 +212,119 @@ export default function BodyPage() {
             const progress = isGrowing
               ? ((m.current - m.start) / (m.goal - m.start)) * 100
               : ((m.start - m.current) / (m.start - m.goal)) * 100
-            const pctClamped = Math.min(Math.max(progress, 0), 100)
-
+            const pct = Math.min(Math.max(progress, 0), 100)
             return (
-              <div key={m.part} className="bg-dark-600/40 rounded-xl p-3 border border-dark-500">
+              <div key={m.part} className="bg-[#0a0a0a] rounded-xl p-3 border border-[#1a1a1a]">
                 <div className="flex justify-between items-center mb-1.5">
-                  <span className="text-xs font-medium text-gray-400">{m.part}</span>
+                  <span className="text-xs text-neutral-500">{m.part}</span>
                   <span className="text-sm font-bold text-white">{m.current}{m.unit}</span>
                 </div>
-                <div className="h-1.5 rounded-full bg-dark-400 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${isGrowing ? 'bg-brand-cyan' : 'bg-brand-green'}`}
-                    style={{ width: `${pctClamped}%` }}
-                  />
+                <div className="h-1 rounded-full bg-[#1a1a1a]">
+                  <div className="h-full rounded-full bg-blue-700" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="flex justify-between mt-1">
-                  <span className="text-xs text-gray-600">Start: {m.start}{m.unit}</span>
-                  <span className={`text-xs ${isGrowing ? 'text-brand-cyan' : 'text-brand-green'}`}>→ {m.goal}{m.unit}</span>
+                  <span className="text-xs text-neutral-700">Start: {m.start}{m.unit}</span>
+                  <span className="text-xs text-blue-700">→ {m.goal}{m.unit}</span>
                 </div>
               </div>
             )
           })}
         </div>
-        <p className="text-xs text-gray-600 mt-3">Measure weekly, same time, fasted. Waist down = fat loss. Arms/quads up = muscle gain.</p>
+        <p className="text-xs text-neutral-700 mt-3">Measure every Sunday, fasted. Waist ↓ = fat loss. Arms/quads ↑ = muscle gain.</p>
       </div>
 
-      {/* Testosterone protocol */}
-      <div className="card">
-        <h2 className="font-semibold text-white mb-2 flex items-center gap-2">
-          <Target className="w-5 h-5 text-brand-orange" />
-          Double Testosterone Protocol
-        </h2>
-        <p className="text-xs text-gray-500 mb-4">
-          Natural testosterone can be doubled through lifestyle. Tick what you're doing consistently.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      {/* ── TESTOSTERONE SECTION ─────────────────────────────── */}
+      <div className="card border-[#1a1a2e]">
+        {/* Header with live T-score */}
+        <div className="flex items-start justify-between mb-1">
+          <div>
+            <h2 className="font-bold text-white text-lg flex items-center gap-2">
+              <Zap className="w-5 h-5 text-blue-500" />
+              Testosterone Optimisation
+            </h2>
+            <p className="text-xs text-neutral-600 mt-0.5">Natural T can be doubled with consistent lifestyle habits</p>
+          </div>
+          {/* Live score */}
+          <div className="text-right bg-[#0a0f1e] border border-blue-950 rounded-xl px-4 py-3">
+            <p className="text-[10px] text-blue-700 uppercase tracking-wider font-semibold">Est. T Multiplier</p>
+            <p className="text-3xl font-black text-white">{estimatedTMultiplier}<span className="text-blue-600 text-lg">×</span></p>
+            <p className="text-[10px] text-neutral-700">{checkedCount} habits active</p>
+          </div>
+        </div>
+
+        {/* Score bar */}
+        <div className="mt-4 mb-5">
+          <div className="flex justify-between text-xs mb-1.5">
+            <span className="text-neutral-600">Protocol completion</span>
+            <span className="text-white font-semibold">{checkedCount}/{TESTO_PROTOCOL.length} habits · {highImpactDone}/{highImpactTotal} high-impact</span>
+          </div>
+          <div className="h-2 rounded-full bg-[#0f0f0f] border border-[#1a1a1a]">
+            <div className="h-full rounded-full bg-gradient-to-r from-blue-800 to-blue-500 transition-all duration-500"
+              style={{ width: `${(checkedCount / TESTO_PROTOCOL.length) * 100}%` }} />
+          </div>
+          <div className="flex justify-between text-[10px] text-neutral-700 mt-1">
+            <span>Baseline (1×)</span>
+            <span>Natural peak (~2.2×)</span>
+          </div>
+        </div>
+
+        {/* Protocol checklist */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-5">
           {TESTO_PROTOCOL.map(item => {
             const checked = checkedProtocol.has(item.action)
             return (
               <button
                 key={item.action}
                 onClick={() => toggleProtocol(item.action)}
-                className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all duration-200
-                  ${checked
-                    ? 'bg-brand-orange/10 border-brand-orange/20'
-                    : 'bg-dark-600/30 border-dark-500 hover:border-dark-400'
-                  }`}
+                className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all duration-150
+                  ${checked ? 'bg-[#0a0f1e] border-blue-900/50' : 'bg-[#0a0a0a] border-[#1a1a1a] hover:border-[#2a2a2a]'}`}
               >
-                <div className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center
-                  ${checked ? 'bg-brand-orange border-brand-orange' : 'border-dark-300'}`}>
-                  {checked && <span className="text-black text-xs font-bold">✓</span>}
+                <div className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center flex-none
+                  ${checked ? 'bg-blue-600 border-blue-600' : 'border-[#333]'}`}>
+                  {checked && <span className="text-white text-[10px] font-bold">✓</span>}
                 </div>
-                <div>
-                  <p className={`text-xs font-medium ${checked ? 'text-brand-orange' : 'text-gray-300'}`}>
-                    {item.action}
-                  </p>
-                  <div className="flex gap-1 mt-0.5">
-                    <span className="text-xs text-gray-600">{item.category}</span>
-                    {item.impact === 'high' && (
-                      <span className="text-xs text-brand-orange font-semibold">· HIGH IMPACT</span>
-                    )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={`text-xs font-medium leading-tight ${checked ? 'text-white' : 'text-neutral-400'}`}>
+                      {item.action}
+                    </p>
+                    <span className={`flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded
+                      ${item.impact === 'high' ? 'bg-blue-950 text-blue-400' : 'bg-[#111] text-neutral-600'}`}>
+                      +{item.boost}%
+                    </span>
                   </div>
+                  <p className="text-[10px] text-neutral-700 mt-0.5 leading-tight">{item.mechanism}</p>
                 </div>
               </button>
             )
           })}
         </div>
-        <p className="text-xs text-gray-600 mt-3">
-          You're doing {checkedProtocol.size}/{TESTO_PROTOCOL.length} consistently. At 10+, expect 40-80% testosterone increase over 3-6 months.
-        </p>
+
+        {/* T killers */}
+        <div>
+          <h3 className="text-xs text-neutral-600 uppercase tracking-wider font-semibold mb-3">T Killers — Avoid These</h3>
+          <div className="space-y-1.5">
+            {T_KILLERS.map(k => (
+              <div key={k.thing} className="flex items-center justify-between p-2.5 rounded-xl bg-[#0a0a0a] border border-[#1a1a1a]">
+                <div className="flex items-center gap-3">
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${k.severity === 'high' ? 'bg-red-800' : 'bg-neutral-700'}`} />
+                  <span className="text-xs text-neutral-400 font-medium">{k.thing}</span>
+                </div>
+                <span className="text-xs text-neutral-600">{k.effect}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Timeline */}
+        <div className="mt-4 p-4 rounded-xl bg-[#0a0f1e] border border-blue-950/50">
+          <p className="text-xs text-blue-500 font-semibold uppercase tracking-wider mb-2">Expected Timeline</p>
+          <div className="grid grid-cols-3 gap-3 text-center text-xs">
+            <div><p className="text-white font-bold">4 weeks</p><p className="text-neutral-600">Sleep + zinc = first noticeable improvements</p></div>
+            <div><p className="text-white font-bold">8-12 weeks</p><p className="text-neutral-600">Consistent training + diet = 30-50% increase</p></div>
+            <div><p className="text-white font-bold">6 months</p><p className="text-neutral-600">Full protocol = 80-120% above baseline</p></div>
+          </div>
+        </div>
       </div>
 
       {showLog && <QuickLogModal type="body" onClose={() => setShowLog(false)} />}

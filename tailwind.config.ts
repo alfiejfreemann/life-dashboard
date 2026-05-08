@@ -10,11 +10,12 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          cyan: '#00f5ff',
-          green: '#00ff88',
-          orange: '#ff6b35',
-          red: '#ff4757',
-          purple: '#a855f7',
+          cyan: '#3b82f6',
+          green: '#93c5fd',
+          orange: '#64748b',
+          red: '#ef4444',
+          purple: '#6366f1',
+          blue: '#1d4ed8',
         },
         dark: {
           900: '#050505',
